@@ -1,5 +1,6 @@
-#-----------------------------------6/12 omskrivning af kode-----------------------------------#
-#Sidst opdateret 6/12 kl. 16
+#-----------------------------------Bachelorprojekt R-kode-----------------------------------#
+#Lavet af Benjamin Kollerup og Benjamin Seddighi
+#Sidst opdateret 9/12 kl. 15
 #---------------Dependencies----------------
 #Alle deaktiveret, men alle noedvendige at koere mindst en gang for at alt virker.
 #install.packages("tidyverse")
@@ -109,13 +110,12 @@ UcBerkeley_Roster <- left_join(UcBerkeley,Roster,by.x="RID",by.y="PTID")
 UcBerkeley_Roster <- transmute(UcBerkeley_Roster,
                                PTID,
                                RID,
-                               COMPSUVR = SUMMARYSUVR_WHOLECEREBNORM, #Vaelger UCBerkeleys anbefaling
+                               COMPSUVR = SUMMARYSUVR_WHOLECEREBNORM,
                                EXAMDATE_PET = EXAMDATE)
-
 
 #Har valgt at forsoege at droppe UCSF, Da den kun koerer med ADNI1-data.
 
-#Forsoeger med University of California Davis!!
+#Bruger i stedet University of California Davis!!
 Ucdvol <- ADNIMERGE::ucd_wmh
 Ucdvol <- transmute(Ucdvol,
                     RID,
@@ -129,6 +129,7 @@ Ucdvol <- distinct(Ucdvol, TESTFORDUPES,.keep_all = TRUE) #Hvilket der ikke er.
 
 #Merger med Roster, og laver baseline og tid2:
 Ucdvol_Roster <- left_join(Ucdvol,Roster, by.x="RID",by.y="PTID")
+#PTID kobles på og anvendes i stedet for RID, da nogle dataseat kun angiver patienternes PTID.
 
 #1. MRI:
 MRI_baseline <- transmute(Ucdvol_Roster,
@@ -183,7 +184,7 @@ MRI_SUVR$TIME_DIFF[MRI_SUVR$TIME_DIFF == "0"] <- NA
 MRI_SUVR <- na.omit(MRI_SUVR) 
 
 
-#---------Tilfoejelse af data om patienterne, bla. psykisk sygdom---------
+#---------Tilfoejelse af data om patienterne:---------
 
 #Tilfoejer ADNI protokoldata
 adnidata <- ADNIMERGE::adnimerge
@@ -201,7 +202,12 @@ adnidata <- distinct(adnidata, RID,.keep_all = TRUE)
 #Og merger ADNIdata ind:
 MRI_SUVR<- left_join(MRI_SUVR,adnidata,by.x="RID",by.y="RID",.keep_all = TRUE)
 
+#---------Deaktiveret! Tilfoejelse af psych og neuro data, til ekskludering-------
+
 #------------------------------#
+#Fjernede tidligere ADNI3 data, da datasaet om psykisk og neurologisk sygdom ikke inkluderede ADNI3.
+#Blev loest ved at vi ikke laengere ekskluderede paa baggrund af dette.
+
 #INGEN GRUND TIL AT FJERNE ADNI3 LAENGERE!
 #Data om diagnose, inden ADNI3 fjernelse:
 #table(MRI_SUVR$DIAGNOSIS)
@@ -213,7 +219,6 @@ MRI_SUVR<- left_join(MRI_SUVR,adnidata,by.x="RID",by.y="RID",.keep_all = TRUE)
 #Data om diagnose, efter ADNI3 fjernelse:
 #table(MRI_SUVR$DIAGNOSIS)
 
-#------------------------------#
 
 #Goer nu det samme med medical info som for ADNIDATA:
 Medhist <- ADNIMERGE::medhist
@@ -224,12 +229,12 @@ Medhist <- transmute(Medhist,
 Medhist <- na.omit(Medhist)
 Medhist <- distinct(Medhist, RID,.keep_all = TRUE)
 #PROBLEM! Vi har kun adni 1, 2 og go i denne database, men en god slat er fra ADNI3!
-#Loest problem ved at fjerne ADNI3.
+#Tidligere loest problem ved at fjerne ADNI3.
 #Nu loest ved ikke at kigge på psych og neuro!
 #Merger medhist ind i vores data:
 MRI_SUVR <- left_join(MRI_SUVR,Medhist,by.x="RID",by.y="RID",.keep_all = TRUE)
 
-#----DEAKTIVERET - ADNI har allerede ekskluderet signifikante psych og neuro patienter!----  
+#-----ADNI har allerede ekskluderet signifikante psych og neuro patienter!----#
 #Vi skaerer psykiatriske og neurologiske patienter fra.
 #MRI_SUVR$MHPSYCH[!MRI_SUVR$MHPSYCH == "No"] <- NA
 #MRI_SUVR$MH2NEURL[!MRI_SUVR$MH2NEURL == "No"] <- NA
@@ -237,7 +242,7 @@ MRI_SUVR <- left_join(MRI_SUVR,Medhist,by.x="RID",by.y="RID",.keep_all = TRUE)
 #Vi faar fjernet en betydelig maengde patienter.
 
 #Data om diagnose, efter psykiatriske og neurologiske patienter fjernelse:
-table(MRI_SUVR$DIAGNOSIS)
+#table(MRI_SUVR$DIAGNOSIS)
 
 #--------------Div. tilfoejelser til dataframes------------
 
@@ -352,7 +357,6 @@ LeftRegression <- function(MRI_SUVR,ekstratekst,xlimval,ylimval){
   
   
   return(print(ggplot(LeftHippoRegression,aes(COMPSUVR,LEFTVOLCHANGE))
-               #+stat_summary(fun.data= mean_cl_normal) 
                +geom_point()
                +geom_smooth(method='lm',formula=y~x)
                +xlab("ß-Amyloid SUVr")
@@ -364,8 +368,6 @@ LeftRegression <- function(MRI_SUVR,ekstratekst,xlimval,ylimval){
                                ifelse(Atrofi_maal==1, ("Relative change in left hippocampal volume per year, as a function of composite SUVr"), 
                                       ifelse(Atrofi_maal==2, ("Left hippocampal volume ratio per year, as a function of composite SUVr"), 
                                              "Fejl"))),ekstratekst)
-               #faar bare ggtitle til at spytte den korrekte tekst ud, alt efter om vi kigger paa et relativt eller absolut maal.
-               #Har forsoegt at smide funktionen og R^2 med ind ogsaa:               
                +annotation_custom(grobTree(textGrob(x=0.02,  y=0.9, hjust=0, paste("y=",round(LeftHippoRegression_Formel[2,7],digits=3),
                                                                                    "* x +",round(LeftHippoRegression_Formel[1,7],digits=3),
                                                                                    "  R^2=",LeftHippoRegression_Formel[1,2],
@@ -391,7 +393,6 @@ RightRegression <- function(MRI_SUVR,ekstratekst,xlimval,ylimval){
   
   
   return(print(ggplot(RightHippoRegression,aes(COMPSUVR,RIGHTVOLCHANGE))
-               #+stat_summary(fun.data= mean_cl_normal) 
                +geom_point()
                +geom_smooth(method='lm',formula=y~x)
                +xlab("ß-Amyloid SUVr")
@@ -403,8 +404,6 @@ RightRegression <- function(MRI_SUVR,ekstratekst,xlimval,ylimval){
                                ifelse(Atrofi_maal==1, ("Relative change in right hippocampal volume per year, as a function of composite SUVr"), 
                                       ifelse(Atrofi_maal==2, ("Right hippocampal volume ratio per year, as a function of composite SUVr"), 
                                              "Fejl"))),ekstratekst)
-               #faar bare ggtitle til at spytte den korrekte tekst ud, alt efter om vi kigger paa et relativt eller absolut maal.
-               #Har forsoegt at smide funktionen og R^2 med ind ogsaa:               
                +annotation_custom(grobTree(textGrob(x=0.02,  y=0.9, hjust=0, paste("y=",round(RightHippoRegression_Formel[2,7],digits=3),
                                                                                    "* x +",round(RightHippoRegression_Formel[1,7],digits=3),
                                                                                    "  R^2=",RightHippoRegression_Formel[1,2],
@@ -430,7 +429,6 @@ TotalRegression <- function(MRI_SUVR,ekstratekst,xlimval,ylimval){
   
   
   return(print(ggplot(TotalHippoRegression,aes(COMPSUVR,TOTALVOLCHANGE))
-               #+stat_summary(fun.data= mean_cl_normal) 
                +geom_point()
                +geom_smooth(method='lm',formula=y~x)
                +xlab("ß-Amyloid SUVr")
@@ -442,9 +440,6 @@ TotalRegression <- function(MRI_SUVR,ekstratekst,xlimval,ylimval){
                                ifelse(Atrofi_maal==1, ("Relative change in total hippocampal volume per year, as a function of composite SUVr"), 
                                       ifelse(Atrofi_maal==2, ("Total hippocampal volume ratio per year, as a function of composite SUVr"), 
                                              "Fejl"))),ekstratekst)
-               #+theme(plot.title = element_text(size = 50, face = "bold"))
-               #faar bare ggtitle til at spytte den korrekte tekst ud, alt efter om vi kigger paa et relativt eller absolut maal.
-               #Har forsoegt at smide funktionen og R^2 med ind ogsaa:               
                +annotation_custom(grobTree(textGrob(x=0.02,  y=0.9, hjust=0, paste("y=",round(TotalHippoRegression_Formel[2,7],digits=3),
                                                                                    ifelse(TotalHippoRegression_Formel[1,7]<0,"* x ","* x +"),round(TotalHippoRegression_Formel[1,7],digits=3),
                                                                                    "  R^2=",TotalHippoRegression_Formel[1,2],
@@ -587,8 +582,8 @@ Regression_female <- TotalRegression(MRI_SUVR_female, ekstratekst, xlimval, ylim
 ekstratekst = "Stratified for cut-off (over cut-off value)"
 xlimval <- c(xlimitmin,xlimitmax)
 ylimval <- c(ylimitmin,ylimitmax)
-#Laeg maerke til at jeg har valgt at holde x inden for samme interval som for de andre, selvom det selvfoelgelig vil se lidt maerkeligt ud.
-#Skal vi beholde det saadan, eller skal vi tilpasse den til data?
+
+
 LeftRegression(MRI_SUVR_Overcut, ekstratekst, xlimval, ylimval)
 RightRegression(MRI_SUVR_Overcut, ekstratekst, xlimval, ylimval)
 Regression_overcut <- TotalRegression(MRI_SUVR_Overcut, ekstratekst, xlimval, ylimval)
@@ -597,8 +592,8 @@ Regression_overcut <- TotalRegression(MRI_SUVR_Overcut, ekstratekst, xlimval, yl
 ekstratekst = "Stratified for cut-off (under cut-off value)"
 xlimval <- c(xlimitmin,xlimitmax)
 ylimval <- c(ylimitmin,ylimitmax)
-#Laeg maerke til at jeg har valgt at holde x inden for samme interval som for de andre, selvom det selvfoelgelig vil se lidt maerkeligt ud.
-#Skal vi beholde det saadan, eller skal vi tilpasse den til data?
+
+
 LeftRegression(MRI_SUVR_Undercut, ekstratekst, xlimval, ylimval)
 RightRegression(MRI_SUVR_Undercut, ekstratekst, xlimval, ylimval)
 Regression_undercut <- TotalRegression(MRI_SUVR_Undercut, ekstratekst, xlimval, ylimval)
@@ -639,8 +634,6 @@ MRI_SUVR_cutoff <- transmute(MRI_SUVR_cutoff,
                              cutoff)
 
 print(ggplot(MRI_SUVR_cutoff,aes(COMPSUVR,TOTALVOLCHANGE,fill = cutoff, shape = cutoff, color = cutoff))
-      
-      #+stat_summary(fun.data= mean_cl_normal) 
       +theme_bw() #Vi kan koere denne på alle de andre ogsaa!
       +geom_point(size = 1.5, )
       +scale_color_manual(values = custompalette)
@@ -658,23 +651,18 @@ print(ggplot(MRI_SUVR_cutoff,aes(COMPSUVR,TOTALVOLCHANGE,fill = cutoff, shape = 
                       ifelse(Atrofi_maal==1, ("Relative change in total hippocampal volume per year, as a function of composite SUVr"), 
                              ifelse(Atrofi_maal==2, ("Total hippocampal volume ratio per year, as a function of composite SUVr"), 
                                     "Fejl"))),ekstratekst)
-      #+theme(plot.title = element_text(size = 50, face = "bold"))
-      #faar bare ggtitle til at spytte den korrekte tekst ud, alt efter om vi kigger paa et relativt eller absolut maal.
-      #Har forsoegt at smide funktionen og R^2 med ind ogsaa:               
       +annotation_custom(grobTree(textGrob(x=0.02,  y=0.95, hjust=0, paste("y=",round(Undercut_formel[2,7],digits=3),
                                                                            ifelse(Undercut_formel[1,7]<0,"* x ","* x +"),round(Undercut_formel[1,7],digits=3),
                                                                            "  R^2=",Undercut_formel[1,2],
                                                                            " T-value=",round(Undercut_formel[2,9],digits=3),
                                                                            " P-value=",ifelse(Undercut_formel[2,10]<0.001,formatC(Undercut_formel[2,10], format = "f", digits=4),round(Undercut_formel[2,10],digits=4))),
                                            gp=gpar(col="#0072B2", fontsize=16, fontface="italic")),
-                                  
                                   textGrob(x=0.02,  y=0.90, hjust=0, paste("y=",round(Overcut_formel[2,7],digits=3),
                                                                            ifelse(Overcut_formel[1,7]<0,"* x ","* x +"),round(Overcut_formel[1,7],digits=3),
                                                                            "  R^2=",Overcut_formel[1,2],
                                                                            " T-value=",round(Overcut_formel[2,9],digits=3),
                                                                            " P-value=",ifelse(Overcut_formel[2,10]<0.001,formatC(Overcut_formel[2,10], format = "f", digits=4),round(Overcut_formel[2,10],digits=4))),
                                            gp=gpar(col="#D55E00", fontsize=16, fontface="italic"))))
-      
 )
 #Width:800 Height:500
 ggsave(filename = "Rplot strat for cutoff.png", device = "png", width =7.9 , height =5.7 , dpi=700)
@@ -862,22 +850,16 @@ MMSEHippoVol <- transmute(MRI_SUVR_just,
 MMSEHippoRegression_Formel <- ls.print(lsfit(MMSEHippoVol$MMSE,MMSEHippoVol$TOTALVOLCHANGE))
 MMSEHippoRegression_Formel <- as.data.frame(MMSEHippoRegression_Formel)
 print(ggplot(MMSEHippoVol,aes(MMSE,TOTALVOLCHANGE))
-      #+stat_summary(fun.data= mean_cl_normal) 
       +geom_point()
       +geom_smooth(method='lm',formula=y~x+I(x^2))
       +xlab("Baseline Mini-Mental State Examination score")
       +ylab("Rel. change for total hippocampal volume /year")
-      #+coord_cartesian(
-      #  xlim = c(xlimitmin,xlimitmax),
-      #  ylim = c(ylimitmin,ylimitmax))
       +ggtitle(ifelse(Atrofi_maal==0, ("Absolute change in total hippocampal volume per year, as a function of MMSE score at baseline"), 
                       ifelse(Atrofi_maal==1, ("Relative change in total hippocampal volume per year, as a function of MMSE score at baseline"), 
                              ifelse(Atrofi_maal==2, ("Total hippocampal volume ratio per year, as a function of MMSE score at baseline"), 
                                     "Fejl"))),
                #"", #Her kan staa brødtekst
       )
-      #faar bare ggtitle til at spytte den korrekte tekst ud, alt efter om vi kigger paa et relativt eller absolut maal.
-      #Har forsoegt at smide funktionen og R^2 med ind ogsaa:               
       +annotation_custom(grobTree(textGrob(x=0.02,  y=0.9, hjust=0, paste("y=",round(MMSEHippoRegression_Formel[2,7],digits=3),
                                                                           "* x +",round(MMSEHippoRegression_Formel[1,7],digits=3),
                                                                           "  R^2=",MMSEHippoRegression_Formel[1,2],
@@ -916,22 +898,16 @@ MMSESUVRRegression_Formel <- ls.print(lsfit(MMSEHippoVol$MMSE,MMSEHippoVol$COMPS
 MMSESUVRRegression_Formel <- as.data.frame(MMSESUVRRegression_Formel)
 
 print(ggplot(MMSEHippoVol,aes(MMSE,COMPSUVR))
-      #+stat_summary(fun.data= mean_cl_normal) 
       +geom_point()
       +geom_smooth(method='lm',formula=y~x)
       +xlab("Baseline Mini-Mental State Examination score")
       +ylab("ß-Amyloid SUVr")
-      #+coord_cartesian(
-      #  xlim = c(xlimitmin,xlimitmax),
-      #  ylim = c(ylimitmin,ylimitmax))
       +ggtitle(ifelse(Atrofi_maal==0, ("ß-Amyloid SUVr as a function of MMSE score at baseline"), 
                       ifelse(Atrofi_maal==1, ("ß-Amyloid SUVr as a function of MMSE score at baseline"), 
                              ifelse(Atrofi_maal==2, ("ß-Amyloid SUVr as a function of MMSE score at baseline"), 
                                     "Fejl"))),
                #"", #Her kan staa brødtekst
-      )
-      #faar bare ggtitle til at spytte den korrekte tekst ud, alt efter om vi kigger paa et relativt eller absolut maal.
-      #Har forsoegt at smide funktionen og R^2 med ind ogsaa:               
+      )              
       +annotation_custom(grobTree(textGrob(x=0.02,  y=0.9, hjust=0, paste("y=",round(MMSESUVRRegression_Formel[2,7],digits=3),
                                                                           "* x +",round(MMSESUVRRegression_Formel[1,7],digits=3),
                                                                           "  R^2=",MMSESUVRRegression_Formel[1,2],
@@ -996,7 +972,6 @@ sd(MRI_SUVR_AD$MMSE)
 
 #--------------Ekstra funktioner, tests mm-------------
 ggarrange(
-  #Regression_ujust,
   Regression_male,
   Regression_female,
   Regression_undercut,
@@ -1036,7 +1011,6 @@ sd(MRI_SUVR_LMCI$TIME_DIFF)
 sd(MRI_SUVR_AD$TIME_DIFF)
 
 ggarrange(
-  #Regression_ujust,
   Regression_undercut,
   Regression_overcut,
   nrow = 1,ncol = 2)
@@ -1073,8 +1047,7 @@ TotalQuadRegression <- function(MRI_SUVR,starttekst,ekstratekst,xlimval,ylimval)
   
   
   
-  return(print(ggplot(TotalHippoRegression,aes(COMPSUVR,TOTALVOLCHANGE))
-               #+stat_summary(fun.data= mean_cl_normal) 
+  return(print(ggplot(TotalHippoRegression,aes(COMPSUVR,TOTALVOLCHANGE)) 
                +geom_point()
                +theme_bw()
                +geom_smooth(method='lm',formula=y~x+I(x^2),se=TRUE)
@@ -1087,14 +1060,10 @@ TotalQuadRegression <- function(MRI_SUVR,starttekst,ekstratekst,xlimval,ylimval)
                                                 ifelse(Atrofi_maal==1, ("Relative change in total hippocampal volume per year, as a function of composite SUVr"), 
                                                        ifelse(Atrofi_maal==2, ("Total hippocampal volume ratio per year, as a function of composite SUVr"), 
                                                               "Fejl")))),ekstratekst)
-               #+theme(plot.title = element_text(size = 50, face = "bold"))
-               #faar bare ggtitle til at spytte den korrekte tekst ud, alt efter om vi kigger paa et relativt eller absolut maal.
-               #Har forsoegt at smide funktionen og R^2 med ind ogsaa:               
                +annotation_custom(grobTree(textGrob(x=0.2,  y=0.9, hjust=0, paste("y=",round(quadfunct[3,1],digits=3),
                                                                                   ifelse(quadfunct[2,1]<0,"x^2"," x^2+"),round(quadfunct[2,1],digits=3),
                                                                                   ifelse(quadfunct[1,1]<0,"x ","x+"),round(quadfunct[1,1],digits=3)),
                                                     gp=gpar(col="red", fontsize=16, fontface="italic")),
-                                           
                                            grobTree(textGrob(x=0.2,  y=0.1, hjust=0, paste("R^2=",round(quadraticfunction[[8]],digits=3),
                                                                                            ", F-value=",round(ftest[1,1],digits=3),
                                                                                            ", P-value=",ifelse(pval<0.001,formatC(pval, format = "f", digits = 2),round(pval,digits=4))),
@@ -1154,40 +1123,26 @@ Regression_female <- TotalQuadRegression(MRI_SUVR_female,"", ekstratekst, xlimva
 ekstratekst = "Stratified for cut-off (over cut-off value)"
 xlimval <- c(xlimitmin,xlimitmax)
 ylimval <- c(ylimitmin,ylimitmax)
-#Laeg maerke til at jeg har valgt at holde x inden for samme interval som for de andre, selvom det selvfoelgelig vil se lidt maerkeligt ud.
-#Skal vi beholde det saadan, eller skal vi tilpasse den til data?
+
+
 Regression_overcut <- TotalQuadRegression(MRI_SUVR_Overcut,starttekst, ekstratekst, xlimval, ylimval)
 
 #Under cut-off graensen:
 ekstratekst = "Stratified for cut-off (under cut-off value)"
 xlimval <- c(xlimitmin,xlimitmax)
 ylimval <- c(ylimitmin,ylimitmax)
-#Laeg maerke til at jeg har valgt at holde x inden for samme interval som for de andre, selvom det selvfoelgelig vil se lidt maerkeligt ud.
-#Skal vi beholde det saadan, eller skal vi tilpasse den til data?
+
+
 Regression_undercut <- TotalQuadRegression(MRI_SUVR_Undercut,starttekst, ekstratekst, xlimval, ylimval)
 
 
 ggarrange(
-  #Regression_ujust,
   Regression_male,
   Regression_female,
-  #Regression_undercut,
-  #Regression_overcut,
-  #Regression_CN,
-  #Regression_SMC,
-  #Regression_EMCI,
-  #Regression_LMCI,
-  #Regression_AD,
-  #MMSEHippoBox,
   nrow = 1,ncol = 2)
 # Width= 1550, height = 400
 ggsave(filename = "Rplot strat for gender.png", device = "png", width =16.5 , height =5 , dpi=700)
 ggarrange(
-  #Regression_ujust,
-  #Regression_male,
-  #Regression_female,
-  #Regression_undercut,
-  #Regression_overcut,
   Regression_CN,
   Regression_SMC,
   Regression_EMCI,
@@ -1198,14 +1153,12 @@ ggarrange(
 # Width = 1550, height = 1200
 ggsave(filename = "Rplot strat for diagnosis and boxplot.png", device = "png", width =16.5 , height =15 , dpi=700)
 #Andengradsfunktioner paa een graf--------------
+#With 5 stratifications needing functions:
 CompleteDiagnostrat <- function(MRI_SUVR,ekstratekst,xlimval,ylimval){
   return(print(ggplot(MRI_SUVR,aes(COMPSUVR,TOTALVOLCHANGE,group = DIAGNOSIS, fill = DIAGNOSIS, shape = DIAGNOSIS, color = DIAGNOSIS))
-               #+stat_summary(fun.data= mean_cl_normal) 
                +theme_bw() #Vi kan koere denne på alle de andre ogsaa!
-               #+geom_point() #Deaktivering fjerner punkterne
                +scale_color_manual(values = custompalette)
                +theme(legend.position = "top")
-               #+geom_smooth(method='lm', formula = y~x+I(x^2), color="#00000050", se=FALSE) #Bruges til at goere regressionsstregen mere tydelig ift. punkter i baggrunden!
                +xlab("ß-Amyloid SUVr")
                +ylab("Relative change in total hippocampal volume per year")
                +coord_cartesian(
@@ -1221,7 +1174,7 @@ CompleteDiagnostrat <- function(MRI_SUVR,ekstratekst,xlimval,ylimval){
 }
 
 
-
+#With 3 stratifications needing functions:
 Diagnostrat <- function(MRI_SUVR,ekstratekst,xlimval,ylimval, diagnostrat1, diagnostrat2, diagnostrat3){
   
   quadraticfunction1 = summary(lm(TOTALVOLCHANGE~COMPSUVR+I(COMPSUVR^2),data=diagnostrat1))
@@ -1242,12 +1195,9 @@ Diagnostrat <- function(MRI_SUVR,ekstratekst,xlimval,ylimval, diagnostrat1, diag
   pval3 = pf(ftest3[1,1],ftest3[2,1],ftest3[3,1],lower.tail = FALSE)
   
   return(print(ggplot(MRI_SUVR,aes(COMPSUVR,TOTALVOLCHANGE,group = DIAGNOSIS, fill = DIAGNOSIS, shape = DIAGNOSIS, color = DIAGNOSIS))
-               #+stat_summary(fun.data= mean_cl_normal) 
                +theme_bw() #Vi kan koere denne på alle de andre ogsaa!
-               #+geom_point() #Deaktivering fjerner punkterne
                +scale_color_manual(values = custompalette)
                +theme(legend.position = "top")
-               #+geom_smooth(method='lm', formula = y~x+I(x^2), color="#00000050", se=FALSE) #Bruges til at goere regressionsstregen mere tydelig ift. punkter i baggrunden!
                +xlab("ß-Amyloid SUVr")
                +ylab("Relative change in total hippocampal volume per year")
                +coord_cartesian(
@@ -1265,27 +1215,73 @@ Diagnostrat <- function(MRI_SUVR,ekstratekst,xlimval,ylimval, diagnostrat1, diag
                                                                                    "  |   R^2=",round(quadraticfunction1[[8]],digits = 3),
                                                                                    ", F-value=",round(ftest1[1,1],digits = 3),
                                                                                    ", P-value=",ifelse(pval1<0.001,formatC(pval1, format = "f", digits = 2),round(pval1,digits=4))),
-                                                    gp=gpar(col="#0571b0", fontsize=12, fontface="italic")), #blue - MCI & SMC
-                                           
+                                                    gp=gpar(col="#0571b0", fontsize=12, fontface="italic")),
                                            grobTree(textGrob(x=0.05,  y=0.24, hjust=0, paste("y=",round(quadfunct2[3,1],digits=3),
                                                                                              ifelse(quadfunct2[2,1]<0,"x^2"," x^2+"),round(quadfunct2[2,1],digits=3),
                                                                                              ifelse(quadfunct2[1,1]<0,"x ","x+"),round(quadfunct2[1,1],digits=3),
                                                                                              "  |   R^2=",round(quadraticfunction2[[8]],digits = 3),
                                                                                              ", F-value=",round(ftest2[1,1],digits = 3),
                                                                                              ", P-value=",ifelse(pval2<0.001,formatC(pval2, format = "f", digits = 2),round(pval2,digits=4))),
-                                                             gp=gpar(col="#d7191c", fontsize=12, fontface="italic")), #red,  - AD & EMCI 
-                                                    
+                                                             gp=gpar(col="#d7191c", fontsize=12, fontface="italic")),
                                                     grobTree(textGrob(x=0.05,  y=0.17, hjust=0, paste("y=",round(quadfunct3[3,1],digits=3),
                                                                                                       ifelse(quadfunct3[2,1]<0,"x^2"," x^2+"),round(quadfunct3[2,1],digits=3),
                                                                                                       ifelse(quadfunct3[1,1]<0,"x ","x+"),round(quadfunct3[1,1],digits=3),
                                                                                                       "  |   R^2=",round(quadraticfunction3[[8]],digits = 3),
                                                                                                       ", F-value=",round(ftest3[1,1],digits = 3),
                                                                                                       ", P-value=",ifelse(pval3<0.001,formatC(pval3, format = "f", digits = 2),round(pval3,digits=4))),
-                                                                      gp=gpar(col="#008837", fontsize=12, fontface="italic")) #green - LMCI & AD
-                                                             
+                                                                      gp=gpar(col="#008837", fontsize=12, fontface="italic"))
                                                     ))))
   ))
 }
+#With 2 stratifications needing functions (gender):
+Genderstrat <- function(MRI_SUVR,ekstratekst,xlimval,ylimval, MRI_SUVR_male, MRI_SUVR_female){
+  
+  quadraticfunction1 = summary(lm(TOTALVOLCHANGE~COMPSUVR+I(COMPSUVR^2),data=MRI_SUVR_male))
+  quadfunct1 = data.frame(quadraticfunction1[4])
+  ftest1 = data.frame(quadraticfunction1[10])
+  pval1 = pf(ftest1[1,1],ftest1[2,1],ftest1[3,1],lower.tail = FALSE)
+  
+  
+  quadraticfunction2 = summary(lm(TOTALVOLCHANGE~COMPSUVR+I(COMPSUVR^2),data=MRI_SUVR_female))
+  quadfunct2 = data.frame(quadraticfunction2[4])
+  ftest2 = data.frame(quadraticfunction2[10])
+  pval2 = pf(ftest2[1,1],ftest2[2,1],ftest2[3,1],lower.tail = FALSE)
+  
+  
+  return(print(ggplot(MRI_SUVR,aes(COMPSUVR,TOTALVOLCHANGE,group = GENDER, fill = GENDER, shape = GENDER, color = GENDER))
+               +theme_bw() #Vi kan koere denne på alle de andre ogsaa!
+               +scale_color_manual(values = custompalette)
+               +theme(legend.position = "top")
+               +xlab("ß-Amyloid SUVr")
+               +ylab("Relative change in total hippocampal volume per year")
+               +coord_cartesian(
+                 xlim = xlimval,
+                 ylim = ylimval)
+               +ggtitle(ifelse(Atrofi_maal==0, ("Absolute change in total hippocampal volume per year, as a function of composite SUVr"), 
+                               ifelse(Atrofi_maal==1, ("Relative change in total hippocampal volume per year, as a function of composite SUVr"), 
+                                      ifelse(Atrofi_maal==2, ("Total hippocampal volume ratio per year, as a function of composite SUVr"), 
+                                             "Fejl"))),ekstratekst)
+               +geom_smooth(method='lm', formula = y~x+I(x^2), aes(fill =))
+               +annotation_custom(grobTree(textGrob(x=0.05,  y=0.9, hjust=0, paste("y=",round(quadfunct1[3,1],digits=3),
+                                                                                   ifelse(quadfunct1[2,1]<0,"x^2"," x^2+"),round(quadfunct1[2,1],digits=3),
+                                                                                   ifelse(quadfunct1[1,1]<0,"x ","x+"),round(quadfunct1[1,1],digits=3),
+                                                                                   "  |   R^2=",round(quadraticfunction1[[8]],digits = 3),
+                                                                                   ", F-value=",round(ftest1[1,1],digits = 3),
+                                                                                   ", P-value=",ifelse(pval1<0.001,formatC(pval1, format = "f", digits = 2),round(pval1,digits=4))),
+                                                    gp=gpar(col="#0571b0", fontsize=12, fontface="italic")), 
+                                           grobTree(textGrob(x=0.05,  y=0.85, hjust=0, paste("y=",round(quadfunct2[3,1],digits=3),
+                                                                                             ifelse(quadfunct2[2,1]<0,"x^2"," x^2+"),round(quadfunct2[2,1],digits=3),
+                                                                                             ifelse(quadfunct2[1,1]<0,"x ","x+"),round(quadfunct2[1,1],digits=3),
+                                                                                             "  |   R^2=",round(quadraticfunction2[[8]],digits = 3),
+                                                                                             ", F-value=",round(ftest2[1,1],digits = 3),
+                                                                                             ", P-value=",ifelse(pval2<0.001,formatC(pval2, format = "f", digits = 2),round(pval2,digits=4))),
+                                                             gp=gpar(col="#d7191c", fontsize=12, fontface="italic"))
+                                           )))
+  ))
+}
+
+
+
 
 ekstratekst = "Stratified for diagnosis"
 
@@ -1293,7 +1289,8 @@ MRI_SUVR_diagnostrat <- transmute(MRI_SUVR_just,
                                   TOTALVOLCHANGE = na.omit((TOTALHIPPO/TIME_DIFF*365)-Atrofi_just),
                                   COMPSUVR,
                                   Atrofi_maal,
-                                  DIAGNOSIS)
+                                  DIAGNOSIS,
+                                  GENDER)
 custompalette = c("#d7191c","#a2a62d","#008837","#0571b0","#06070E")
 
 CompleteDiagnostrat(MRI_SUVR_diagnostrat,ekstratekst, c(0.8,2), c(-0.075,0.025))
@@ -1358,8 +1355,21 @@ Diagnostrat(MRI_SUVR_diagnostrat_SMC_EMCI_LMCI,ekstratekst, c(0.8,2), c(-0.075,0
 # Width: 750, height = 550
 ggsave(filename = "Rplot strat for EMCI, LMCI, SMC.png", device = "png", width =7.8 , height =5.7 , dpi=700)
 
+#Gender stratifications:
+ekstratekst = "Stratified for gender"
+custompalette = c("#d7191c","#0571b0")
+MRI_SUVR_male <- MRI_SUVR_diagnostrat
+MRI_SUVR_male$GENDER[MRI_SUVR_male$GENDER == "Female"] <- NA
+MRI_SUVR_male <- na.omit(MRI_SUVR_male)
 
-#Eksklusionsdiagram opstilling af udregninger:-----
+MRI_SUVR_female <- MRI_SUVR_diagnostrat
+MRI_SUVR_female$GENDER[MRI_SUVR_female$GENDER == "Male"] <- NA
+MRI_SUVR_female <- na.omit(MRI_SUVR_female)
+Genderstrat(MRI_SUVR_diagnostrat, ekstratekst, c(0.8,2), c(-0.075,0.025), MRI_SUVR_male, MRI_SUVR_female)
+ggsave(filename = "Rplot strat for gender.png", device = "png", width =7.8 , height =5.7 , dpi=700)
+
+#--------Eksklusionsdiagram--------
+#------Eksklusionsdiagram opstilling af udregninger:-----#
 #Total number of ADNI participants (4112)
 Roster <- ADNIMERGE::roster
 Roster <- distinct(Roster, RID, .keep_all = TRUE)
@@ -1440,7 +1450,7 @@ sdtimediff <- sd(CohortInfo$TIMEDIFF)
 table(CohortInfo$GENDER)
 
 
-#Eksklusionsdiagram opstilling af billedet:---------
+#--------Eksklusionsdiagram opstilling af billedet:---------#
 
 withinADNI <- boxGrob(glue("ADNI1, ADNI-GO, ADNI2 & ADNI3 participants",
                            "n = {pop}",
@@ -1472,7 +1482,7 @@ excludedscan <- boxGrob(glue("Excluded (n = {tot}):",
                              " - Less than two MRI-scans: {noMRI}",
                              " - No florbetapir PET-scan: {noflorbetapir}",
                              tot = BerkDavcount - UCDavMultiMRIcount,
-                             noflorbetapir = 0, #Kan også sige notUCBerk
+                             noflorbetapir = 0,
                              noMRI = BerkDavcount - UCDavMultiMRIcount,
                              .sep = "\n"),
                         just = "left", 
@@ -1540,7 +1550,7 @@ excludedscan
 excludedwithindays
 dev.off() #Stopper med at lave eksklusionsdiagram-billedet
 
-#-------------
+#Z-test udregning, spredning af timediff:-------------
 table(MRI_SUVR_just$DIAGNOSIS)
 mean(MRI_SUVR_AD$TIME_DIFF)-1.96*sd(MRI_SUVR_AD$TIME_DIFF)
 mean(MRI_SUVR_AD$TIME_DIFF)+1.96*sd(MRI_SUVR_AD$TIME_DIFF)
@@ -1556,7 +1566,3 @@ sd(MRI_SUVR_CN$TIME_DIFF)/sqrt(233)
 sd(MRI_SUVR_SMC$TIME_DIFF)/sqrt(118)
 sd(MRI_SUVR_EMCI$TIME_DIFF)/sqrt(291)
 sd(MRI_SUVR_LMCI$TIME_DIFF)/sqrt(184)
-
-
-
-
